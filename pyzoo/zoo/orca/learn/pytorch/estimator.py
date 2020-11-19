@@ -23,6 +23,8 @@ import torch
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import DataLoader
 
+from tensorboardX import SummaryWriter
+
 
 class Estimator(object):
     def fit(self, data, epochs, **kwargs):
@@ -138,8 +140,12 @@ class PyTorchRayEstimatorWrapper(Estimator):
         You can also provide custom metrics by passing in a custom training_operator_cls when
         creating the Estimator.
         """
-        return self.estimator.train(data=data, epochs=epochs, batch_size=batch_size,
+        writer = SummaryWriter('runs/fashion_mnist_experiment_1')
+        stats = self.estimator.train(data=data, epochs=epochs, batch_size=batch_size,
                                     profile=profile, reduce_results=reduce_results, info=info)
+        for stat in stats:
+            writer.add_scalar("training_loss", stat['train_loss'], stat['epoch'])
+        return stats
 
     def predict(self, data, **kwargs):
         pass
