@@ -189,20 +189,36 @@ def find_free_port():
 class AverageMeter:
     """Computes and stores the average and current value."""
 
-    def __init__(self):
-        self.reset()
+    def __init__(self, class_num=1):
+        self.reset(class_num)
 
-    def reset(self):
+    def reset(self, class_num):
         self.val = 0
         self.avg = 0
         self.sum = 0
         self.count = 0
+        self.pos = None
+        self.neg = None
+        self.class_auc = None
+        self.auc_result = None
 
     def update(self, val, n=1):
         self.val = val
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+    
+    def update_auc(self, val):
+        if self.class_auc == None:
+            self.class_auc = val["auc"]
+            self.pos = val["pos"]
+            self.neg = val["neg"]
+            self.auc_result = self.class_auc/(self.pos*self.neg)
+        else:
+            self.class_auc += val["auc"]
+            self.pos += val["pos"]
+            self.neg += val["neg"]
+            self.auc_result = self.class_auc/(self.pos*self.neg)
 
 
 class AverageMeterCollection:
@@ -217,14 +233,20 @@ class AverageMeterCollection:
         self._batch_count += 1
         self.n += n
         for metric, value in metrics.items():
-            self._meters[metric].update(value, n=n)
+            if str(metric) is "auc_stats":
+                self._meters[metric].update_auc(value)
+            else:
+                self._meters[metric].update(value, n=n)
 
     def summary(self):
         """Returns a dict of average and most recent values for each metric."""
         stats = {BATCH_COUNT: self._batch_count, NUM_SAMPLES: self.n}
         for metric, meter in self._meters.items():
-            stats[str(metric)] = meter.avg
-            stats["last_" + str(metric)] = meter.val
+            if str(metric) is "auc_stats":
+                stats[str(metric)] = meter.auc_result
+            else:
+                stats[str(metric)] = meter.avg
+                stats["last_" + str(metric)] = meter.val
         return stats
 
 

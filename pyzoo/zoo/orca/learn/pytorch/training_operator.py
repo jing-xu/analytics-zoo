@@ -382,8 +382,12 @@ class TrainingOperator:
                           "validate_batch in TrainingOperator for other validation metrics")
         import numpy as np
         if len(np_output.shape) == 1:  # Binary classification
+            auc_stats = auc(np_target, np_output, 1)
             np_output = np.round(np_output, 0)
+            
         else:  # Multi-class classification
+            print("here")
+            auc_stats = auc(np_target, np_output, np_output.shape[1])
             np_output = np.argmax(np_output, axis=1)
 
         num_correct = np.sum(np_output == np_target)
@@ -393,7 +397,32 @@ class TrainingOperator:
             "val_loss": loss.item(),
             "val_accuracy": num_correct / num_samples,
             NUM_SAMPLES: num_samples
+            #"auc_stats": auc_stats
         }
+        
+    def auc(label, pred, class_num):
+        auc_dict = np.zeros(class_num)
+        pos_dict = np.zeros(class_num)
+        neg_dict = np.zeros(class_num)
+        for class_idx in range(class_num):
+            if(class_num == 1):
+                class_idx = 1
+            pos = [i for i in range(len(label)) if label[i]==class_idx]
+            neg = [i for i in range(len(label)) if label[i]!=class_idx]
+          
+            auc = 0
+            for i in pos:
+                for j in neg:
+                    if pred[i] > pred[j]:
+                        auc += 1
+                    elif pred[i] == pred[j]:
+                        auc += 0.5
+            auc_dict[class_idx] = auc
+            pos_dict[class_idx] = len(pos)
+            neg_dict[class_idx] = len(neg)
+        return {"auc": auc_dict, "pos": pos_dict, "neg": neg_dict}
+        
+        
 
     def state_dict(self):
         """Override this to return a representation of the operator state.
