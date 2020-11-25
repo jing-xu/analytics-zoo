@@ -405,25 +405,6 @@ class TrainingOperator:
         }
         
     def auc(self, label, pred, class_num):
-        """
-        tp_num = np.zeros(class_num)
-        fp_num = np.zeros(class_num)
-        tn_num = np.zeros(class_num)
-        fn_num = np.zeros(class_num)
-        for j in range(len(label)):
-            if label[j] == pred[j]:
-                tp_num[label[j]] += 1
-                for i in range(class_num):
-                    if i != label[j]:
-                        tn_num[i] += 1
-            else:
-                fp_num[pred[j]] += 1
-                fn_num[label[j]] += 1
-                for i in range(class_num):
-                    if i != label[j] and i != pred[j]:
-                        tn_num[i] += 1              
-        return {"tp": tp_num, "fp": fp_num, "tn": tn_num, "fn": fn_num}
-        """
         n_bins = 50
         pos_histograms = np.zeros((class_num, n_bins))
         neg_histograms = np.zeros((class_num, n_bins))
