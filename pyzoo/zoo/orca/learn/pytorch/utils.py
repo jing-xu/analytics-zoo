@@ -197,9 +197,10 @@ class AverageMeter:
         self.avg = 0
         self.sum = 0
         self.count = 0
+        self.pos_his = None
+        self.neg_his = None
         self.pos = None
         self.neg = None
-        self.class_auc = None
         self.auc_result = None
 
     def update(self, val, n=1):
@@ -209,16 +210,24 @@ class AverageMeter:
         self.avg = self.sum / self.count
     
     def update_auc(self, val):
-        if self.class_auc == None:
-            self.class_auc = val["auc"]
+        n_bins = 50
+        if self.pos is None:
+            self.pos_his = val["pos_his"]
+            self.neg_his = val["neg_his"]
             self.pos = val["pos"]
             self.neg = val["neg"]
-            self.auc_result = self.class_auc/(self.pos*self.neg)
         else:
-            self.class_auc += val["auc"]
+            self.pos_his += val["pos_his"]
+            self.neg_his += val["neg_his"]
             self.pos += val["pos"]
             self.neg += val["neg"]
-            self.auc_result = self.class_auc/(self.pos*self.neg)
+        class_num = len(self.pos)
+        satisfied_pairs = np.zeros(class_num)
+        accumulated_neg = np.zeros(class_num)
+        for i in range(n_bins):
+            satisfied_pairs += (self.pos_his[:, i]*accumulated_neg + self.pos_his[:, i]*self.neg_his[:, i]*0.5)
+            accumulated_neg += self.neg_his[:, i]
+        self.auc_result = satisfied_pairs/(self.pos*self.neg)
 
 
 class AverageMeterCollection:

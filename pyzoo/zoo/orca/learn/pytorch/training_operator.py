@@ -33,6 +33,8 @@
 
 import collections
 import torch
+import numpy as np
+from scipy.special import softmax
 
 from zoo.orca.learn.pytorch.utils import (TimerCollection, AverageMeterCollection,
                                           NUM_SAMPLES)
@@ -382,13 +384,15 @@ class TrainingOperator:
                           "validate_batch in TrainingOperator for other validation metrics")
         import numpy as np
         if len(np_output.shape) == 1:  # Binary classification
-            auc_stats = auc(np_target, np_output, 1)
+            auc_stats = self.auc(np_target, np_output, 1)
             np_output = np.round(np_output, 0)
             
+            
         else:  # Multi-class classification
-            print("here")
-            auc_stats = auc(np_target, np_output, np_output.shape[1])
+            class_num = np_output.shape[1]
+            auc_stats = self.auc(np_target, np_output, class_num)
             np_output = np.argmax(np_output, axis=1)
+            
 
         num_correct = np.sum(np_output == np_target)
         num_samples = target.size(0)
@@ -396,33 +400,59 @@ class TrainingOperator:
         return {
             "val_loss": loss.item(),
             "val_accuracy": num_correct / num_samples,
-            NUM_SAMPLES: num_samples
-            #"auc_stats": auc_stats
+            NUM_SAMPLES: num_samples,
+            "auc_stats": auc_stats
         }
         
-    def auc(label, pred, class_num):
-        auc_dict = np.zeros(class_num)
-        pos_dict = np.zeros(class_num)
-        neg_dict = np.zeros(class_num)
-        for class_idx in range(class_num):
-            if(class_num == 1):
-                class_idx = 1
-            pos = [i for i in range(len(label)) if label[i]==class_idx]
-            neg = [i for i in range(len(label)) if label[i]!=class_idx]
-          
-            auc = 0
-            for i in pos:
-                for j in neg:
-                    if pred[i] > pred[j]:
-                        auc += 1
-                    elif pred[i] == pred[j]:
-                        auc += 0.5
-            auc_dict[class_idx] = auc
-            pos_dict[class_idx] = len(pos)
-            neg_dict[class_idx] = len(neg)
-        return {"auc": auc_dict, "pos": pos_dict, "neg": neg_dict}
+    def auc(self, label, pred, class_num):
+        """
+        tp_num = np.zeros(class_num)
+        fp_num = np.zeros(class_num)
+        tn_num = np.zeros(class_num)
+        fn_num = np.zeros(class_num)
+        for j in range(len(label)):
+            if label[j] == pred[j]:
+                tp_num[label[j]] += 1
+                for i in range(class_num):
+                    if i != label[j]:
+                        tn_num[i] += 1
+            else:
+                fp_num[pred[j]] += 1
+                fn_num[label[j]] += 1
+                for i in range(class_num):
+                    if i != label[j] and i != pred[j]:
+                        tn_num[i] += 1              
+        return {"tp": tp_num, "fp": fp_num, "tn": tn_num, "fn": fn_num}
+        """
+        n_bins = 50
+        pos_histograms = np.zeros((class_num, n_bins))
+        neg_histograms = np.zeros((class_num, n_bins))
+        pos = np.zeros(class_num)
+        neg = np.zeros(class_num)
+        pred = softmax(pred, axis=1)
         
+        for i in range(class_num):
+            if class_num == 1:
+                pos[i] = len([x for x in range(len(label)) if label[x] == 1])
+            else:
+                pos[i] = len([x for x in range(len(label)) if label[x] == i])
+            neg[i] = len(label)-pos[i]
+            
+            
+            pos_histogram = [0 for _ in range(n_bins)]
+            neg_histogram = [0 for _ in range(n_bins)]
+            
+            bin_width = 1.0 / n_bins
+            for j in range(len(label)):
+                nth_bin = int(pred[j,i]/bin_width)
+                if label[j]==i:
+                    pos_histogram[nth_bin] += 1
+                else:
+                    neg_histogram[nth_bin] += 1
+            pos_histograms[i] = pos_histogram
+            neg_histograms[i] = neg_histogram
         
+        return {"pos_his": pos_histograms, "neg_his": neg_histograms, "pos": pos, "neg": neg}
 
     def state_dict(self):
         """Override this to return a representation of the operator state.
